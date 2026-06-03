@@ -1,4 +1,4 @@
-﻿# 自然语言
+# 自然语言
 - 以中文为主语言，commit消息、注释、消息、文字等优先使用中文
 - 英文为副语言，专业性短语、用词使用英文
 
@@ -154,6 +154,12 @@ workers/ocr (Python — 独立，通过 Redis 与 apps/web 通信)
 
 # 代码格式化
 - 用`ESLint` 与 `Prettier` 格式化代码
+
+# 文件编码
+
+- 所有文本文件必须使用 **UTF-8 without BOM** 编码
+- 在 Windows/PowerShell 环境下创建文件时，避免使用 Set-Content -Encoding UTF8（会添加 BOM），改用 WriteAllText 方式。
+- 创建文件后应验证前 3 字节不是 BOM 签名（39 187 191）。
 
 # 代码审查 Checklist
 
