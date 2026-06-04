@@ -1,67 +1,66 @@
 import { describe, it, expect, vi } from "vitest";
 
-// 模拟 OCR 结果轮询逻辑（不依赖 Redis 连接）
-describe("OCR 结果轮询", () => {
-  it("processing 状态表示任务未完成", () => {
-    const response = { status: "processing" };
-    const shouldContinue = response.status === "processing";
-    expect(shouldContinue).toBe(true);
+// 模拟百度 OCR API 返回处理逻辑
+describe("百度 OCR API 结果处理", () => {
+  it("成功时返回 text", () => {
+    const mockResponse = {
+      words_result: [{ words: "求解方程" }, { words: "x^2+2x+1=0" }],
+      words_result_num: 2,
+    };
+
+    const text = mockResponse.words_result.map((w) => w.words).join("\n");
+    expect(text).toBe("求解方程\nx^2+2x+1=0");
   });
 
-  it("completed 状态应停止轮询", () => {
-    const response = { status: "completed", content: "题目文本", answer: "答案文本" };
-    const shouldContinue = response.status === "processing";
-    expect(shouldContinue).toBe(false);
-    expect(response.content).toBe("题目文本");
-    expect(response.answer).toBe("答案文本");
+  it("空结果返回空字符串", () => {
+    const mockResponse = { words_result: [], words_result_num: 0 };
+    const words = mockResponse.words_result ?? [];
+    const text = words.length > 0 ? words.map((w) => w.words).join("\n") : "";
+    expect(text).toBe("");
   });
 
-  it("failed 状态应停止轮询", () => {
-    const response = { status: "failed", error: "识别失败" };
-    const shouldContinue = response.status === "processing";
-    expect(shouldContinue).toBe(false);
-    expect(response.error).toBe("识别失败");
+  it("鉴权失败返回 null", () => {
+    // 模拟 token 获取失败
+    const token: string | null = null;
+    const result = token ? "有结果" : null;
+    expect(result).toBeNull();
   });
 
-  it("30 秒超时应停止轮询（15 次 × 2 秒）", () => {
-    const MAX_ATTEMPTS = 15;
-    const INTERVAL_MS = 2000;
-    expect(MAX_ATTEMPTS * INTERVAL_MS).toBe(30000);
+  it("超时降级返回 null", () => {
+    // 模拟 AbortError
+    const isTimeout = true;
+    const result = isTimeout ? null : "识别文本";
+    expect(result).toBeNull();
   });
 
-  it("OCR 结果仅有 content 时 answer 为空", () => {
-    const result = { status: "completed", content: "题目文本" };
-    const answer = result.answer ?? "";
-    expect(answer).toBe("");
-    expect(result.content).toBe("题目文本");
+  it("API 错误响应的 error_msg 被提取", () => {
+    const errorResponse = { error_code: 17, error_msg: "Open api daily request limit reached" };
+    expect(errorResponse.error_msg).toContain("limit");
   });
 });
 
-describe("OCR 结果回填", () => {
-  it("completed 时 setValue 应传入 content 和 answer", () => {
-    const result = { status: "completed", content: "题目", answer: "作答" };
-    const formValues = { content: "", answer: "" };
-
-    if (result.status === "completed") {
-      formValues.content = result.content ?? "";
-      formValues.answer = result.answer ?? "";
-    }
-
-    expect(formValues.content).toBe("题目");
-    expect(formValues.answer).toBe("作答");
+describe("上传 API 响应格式", () => {
+  it("正常响应包含 imageKey 和 ocrContent", () => {
+    const response = {
+      imageKey: "problems/1/uuid.jpg",
+      ocrContent: "识别出的文本内容",
+    };
+    expect(response.imageKey).toBeTruthy();
+    expect(response.ocrContent).toBeTruthy();
   });
 
-  it("识别中不修改字段", () => {
-    const result = { status: "processing" };
-    const formValues = { content: "已有内容", answer: "已有作答" };
+  it("OCR 降级时 ocrContent 为 null", () => {
+    const response = {
+      imageKey: "problems/1/uuid.jpg",
+      ocrContent: null,
+    };
+    expect(response.imageKey).toBeTruthy();
+    expect(response.ocrContent).toBeNull();
+  });
 
-    if (result.status === "completed") {
-      formValues.content = result.content ?? "";
-      formValues.answer = result.answer ?? "";
-    }
-
-    // 保持原值不变
-    expect(formValues.content).toBe("已有内容");
-    expect(formValues.answer).toBe("已有作答");
+  it("错误响应不含 ocrContent", () => {
+    const response = { error: "上传失败" };
+    expect(response).not.toHaveProperty("ocrContent");
+    expect(response.error).toBeTruthy();
   });
 });

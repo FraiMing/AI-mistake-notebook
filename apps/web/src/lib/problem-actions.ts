@@ -6,7 +6,6 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { uploadImage } from "@/lib/minio-client";
-import { addOcrJob } from "@/lib/ocr-queue";
 import { randomUUID } from "crypto";
 
 const createProblemSchema = z.object({

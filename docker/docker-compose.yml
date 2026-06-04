@@ -1,5 +1,3 @@
-﻿
-
 services:
   app:
     build:
@@ -46,21 +44,6 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - minio-data:/data
-
-  ocr-worker:
-    build:
-      context: ../workers/ocr
-      dockerfile: ../../docker/Dockerfile.ocr
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - MINIO_ENDPOINT=minio
-      - MINIO_PORT=9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_BUCKET=ai-notebook-images
-    depends_on:
-      redis:
-        condition: service_healthy
 
 volumes:
   app-data:

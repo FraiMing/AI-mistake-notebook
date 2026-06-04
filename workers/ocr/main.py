@@ -3,7 +3,7 @@ import os
 import json
 import logging
 from minio import Minio
-from bullmq import Worker
+from bullmq import Worker, Job
 import redis.asyncio as redis
 
 logging.basicConfig(level=logging.INFO)
@@ -38,12 +38,14 @@ def get_minio_client():
     )
 
 
-async def process_ocr(job_id: str, job_data: dict):
+async def process_ocr(job: Job, token: str):
     """处理 OCR 任务：下载图片 → PaddleOCR 推理 → 写回 Redis"""
+    # BullMQ Python 库传入 Job 对象，数据在 job.data 中
+    job_data = job.data
     image_key = job_data.get("imageKey", "")
     bucket = job_data.get("bucket", MINIO_BUCKET)
 
-    logger.info(f"开始处理 OCR 任务: {image_key}")
+    logger.info(f"开始处理 OCR 任务 [{job.id}]: {image_key}")
 
     try:
         # 1. 从 MinIO 下载图片
@@ -76,7 +78,7 @@ async def process_ocr(job_id: str, job_data: dict):
             "status": "completed",
             "content": content,
             "answer": answer,
-        })
+        }, ensure_ascii=False)
 
         logger.info(f"OCR 识别完成: {image_key}, 识别行数: {len(content_lines)}")
 
@@ -85,7 +87,7 @@ async def process_ocr(job_id: str, job_data: dict):
         result = json.dumps({
             "status": "failed",
             "error": str(e),
-        })
+        }, ensure_ascii=False)
 
     # 4. 写回 Redis（TTL 600 秒）
     r = await redis.from_url(REDIS_URL)

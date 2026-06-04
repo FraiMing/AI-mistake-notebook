@@ -45,7 +45,10 @@ function compressImage(file: File): Promise<{ base64: string; fileName: string }
         if (!blob) { reject(new Error("压缩失败")); return; }
         const reader = new FileReader();
         reader.onloadend = () => {
-          const base64 = (reader.result as string).split(",")[1];
+          const result = reader.result;
+          if (typeof result !== "string") { reject(new Error("读取失败")); return; }
+          const base64 = result.split(",")[1];
+          if (!base64) { reject(new Error("图片数据无效")); return; }
           resolve({ base64, fileName: file.name.replace(/\.[^.]+$/, ".jpg") });
         };
         reader.readAsDataURL(blob);
@@ -56,54 +59,6 @@ function compressImage(file: File): Promise<{ base64: string; fileName: string }
   });
 }
 
-/** OCR 轮询 hook */
-function useOcrPolling(imageKey: string | null, enabled: boolean) {
-  const [status, setStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
-  const [ocrContent, setOcrContent] = useState("");
-  const [ocrAnswer, setOcrAnswer] = useState("");
-
-  useEffect(() => {
-    if (!imageKey || !enabled) {
-      setStatus("idle");
-      return;
-    }
-
-    setStatus("processing");
-    let attempts = 0;
-    const MAX_ATTEMPTS = 15; // 30 秒超时 / 2 秒间隔
-
-    const interval = setInterval(async () => {
-      attempts++;
-      try {
-        const res = await fetch(`/api/ocr/result?imageKey=${encodeURIComponent(imageKey)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-
-        if (data.status === "completed") {
-          setOcrContent(data.content ?? "");
-          setOcrAnswer(data.answer ?? "");
-          setStatus("completed");
-          clearInterval(interval);
-        } else if (data.status === "failed") {
-          setStatus("failed");
-          clearInterval(interval);
-        }
-      } catch {
-        // 忽略网络错误，继续轮询
-      }
-
-      if (attempts >= MAX_ATTEMPTS) {
-        setStatus("failed");
-        clearInterval(interval);
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [imageKey, enabled]);
-
-  return { status, ocrContent, ocrAnswer };
-}
-
 export function ProblemForm() {
   const [isPending, startTransition] = useTransition();
   const [selectedTags, setSelectedTags] = useState<SelectedMap>({
@@ -111,9 +66,8 @@ export function ProblemForm() {
   });
   const [imageKey, setImageKey] = useState<string | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "error">("idle");
+  const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [pollEnabled, setPollEnabled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { register, handleSubmit, formState: { errors }, setError, setValue } = useForm<FormData>({
@@ -121,18 +75,7 @@ export function ProblemForm() {
     defaultValues: { content: "", answer: "" },
   });
 
-  const ocr = useOcrPolling(imageKey, pollEnabled);
-
-  // OCR 结果回填
-  useEffect(() => {
-    if (ocr.status === "completed") {
-      if (ocr.ocrContent) setValue("content", ocr.ocrContent, { shouldDirty: true });
-      if (ocr.ocrAnswer) setValue("answer", ocr.ocrAnswer, { shouldDirty: true });
-      setPollEnabled(false);
-    }
-  }, [ocr.status, ocr.ocrContent, ocr.ocrAnswer, setValue]);
-
-  // 图片预览：初始和上传后合并逻辑
+  // 图片预览
   useEffect(() => {
     if (!imageKey) { setImagePreviewUrl(null); return; }
     let cancelled = false;
@@ -183,22 +126,24 @@ export function ProblemForm() {
       }
 
       setImageKey(data.imageKey);
-      setUploadStatus("idle");
-      setPollEnabled(true);
+      setUploadStatus("done");
+
+      // 百度 OCR 结果直接回填
+      if (data.ocrContent) {
+        setValue("content", data.ocrContent, { shouldDirty: true });
+      }
     } catch {
       setUploadError("上传失败，请重试");
       setUploadStatus("error");
     }
-  }, []);
+  }, [setValue]);
 
   const removeImage = useCallback(() => {
     setImageKey(null);
     setImagePreviewUrl(null);
-    setPollEnabled(false);
     setUploadStatus("idle");
     setUploadError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    // 不清空已填入的文本
   }, []);
 
   function onSubmit(data: FormData) {
@@ -239,7 +184,7 @@ export function ProblemForm() {
               {uploadStatus === "uploading" ? (
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="h-8 w-8 animate-spin" />
-                  <span className="text-xs">上传中…</span>
+                  <span className="text-xs">上传并识别中…</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
@@ -253,16 +198,10 @@ export function ProblemForm() {
             {uploadError && (
               <p className="text-sm text-destructive">{uploadError}</p>
             )}
-            {ocr.status === "processing" && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                OCR 识别中…
-              </div>
+            {uploadStatus === "done" && (
+              <p className="text-sm text-green-600">上传完成，OCR 识别结果已自动填入</p>
             )}
-            {ocr.status === "completed" && (
-              <p className="text-sm text-green-600">OCR 识别完成，已自动填入文本</p>
-            )}
-            {ocr.status === "failed" && (
+            {uploadStatus === "error" && !uploadError && (
               <p className="text-sm text-destructive">OCR 识别失败，请手动输入</p>
             )}
             <p className="text-xs text-muted-foreground">支持 JPG/PNG 格式，最大 10MB，自动压缩大图</p>

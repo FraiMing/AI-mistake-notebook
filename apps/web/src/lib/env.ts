@@ -11,6 +11,8 @@ const envSchema = z.object({
   MINIO_ACCESS_KEY: z.string().default("minioadmin"),
   MINIO_SECRET_KEY: z.string().default("minioadmin"),
   MINIO_BUCKET: z.string().default("ai-notebook-images"),
+  BAIDU_OCR_API_KEY: z.string().optional(),
+  BAIDU_OCR_SECRET_KEY: z.string().optional(),
   DEEPSEEK_API_KEY: z.string().optional(),
   DEEPSEEK_BASE_URL: z.string().default("https://api.deepseek.com"),
 });

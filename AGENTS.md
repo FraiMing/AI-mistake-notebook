@@ -28,7 +28,7 @@
 | --- | --- | --- |
 | ORM | Drizzle | - |
 | 数据库 | SQLite (via Drizzle) | 嵌入式数据库，单文件存储 |
-| 缓存 & 队列 | Redis 7 + BullMQ | BullMQ 消费 OCR 异步任务，Redis 兼做会话与热点缓存 |
+| 缓存 & 队列 | Redis 7 | Redis 兼做会话与热点缓存 |
 | 对象存储 | MinIO | 题目拍照图片持久存储，S3 兼容 |
 | 认证 | Auth.js v5 (credentials + bcryptjs + Drizzle adapter) | v4 已停维，用 v5 |
 
@@ -37,8 +37,8 @@
 | 类别 | 技术 | 说明 |
 | --- | --- | --- |
 | LLM | DeepSeek-V4 API | 标签识别、作答判断、复习追问，统一封装 |
-| OCR | PaddleOCR | 本地部署 GPU 推理，覆盖文本与公式识别 |
-| OCR Worker | Python 3.12 独立容器 | 消费 BullMQ 任务，执行 OCR 识别 |
+| OCR | 百度云文字识别 API \| HTTP REST 调用，通用文字识别免费 5 万次/日，手写/公式另有专项接口 \|
+
 
 ## 推送（消息页方案）
 
@@ -49,16 +49,16 @@
 | 类别 | 技术 |
 | --- | --- |
 | 容器化 | Docker + Docker Compose |
-| 服务组成 | app (Next.js) + redis + minio + ocr-worker |
+| 服务组成 | app (Next.js) + redis + minio |
 
 ## 服务拓扑
 
-Docker Compose 包含四个服务：
+Docker Compose 包含三个服务：
 
 - app - Next.js 16 (Web UI + API + AI 调用)
 - redis - Redis 7 (队列 + 缓存 + 会话)
 - minio - MinIO (图片存储)
-- ocr-worker - Python 3.12 (PaddleOCR)
+
 
 # 仓库目录结构
 
@@ -98,7 +98,7 @@ ai-error-notebook/
 │       └── package.json
 │
 ├── workers/
-│   └── ocr/                   # Python 3.12 OCR worker
+│   └── ocr/  # （百度云 API 方案后不再使用，保留供参考）
 │       └── ...                 # 独立于 pnpm workspace，按 Python 惯例组织
 │
 ├── docker/                    # 容器化配置集中管理
@@ -125,7 +125,7 @@ ai-error-notebook/
 | `packages/*` 不引入 `react` / `react-dom` / `next` | 共享库是纯逻辑/类型层，UI 框架代码只放在 `apps/*` |
 | `packages/shared-types` 不包含运行时代码 | 只 `export type`，所有包均可安全引用 |
 | `packages/database` 只暴露 Drizzle client 单例 | 不在此包内写业务查询；由调用方自行组装查询 |
-| `workers/ocr` 独立于 pnpm workspace | Python 项目，仅通过 BullMQ（Redis）与 app 通信 |
+| `workers/ocr` 独立于 pnpm workspace | （百度云 API 方案后不再使用，代码保留供参考） |
 
 ## 依赖流向
 
@@ -138,7 +138,7 @@ apps/mobile (deferred) ─┤
  packages/        packages/        packages/
  database         shared-types      ai-client
 
-workers/ocr (Python — 独立，通过 Redis 与 apps/web 通信)
+workers/ocr（百度云 API 方案后不再使用，代码保留供参考）
 ```
 
 `apps/*` → `packages/*`。不可反向引用。
@@ -150,7 +150,6 @@ workers/ocr (Python — 独立，通过 Redis 与 apps/web 通信)
 | app | `docker/Dockerfile.web`（build context: 仓库根） | 3000 | redis, minio |
 | redis | `redis:7` | 6379 | - |
 | minio | `minio/minio` | 9000, 9001 | - |
-| ocr-worker | `docker/Dockerfile.ocr`（build context: `workers/ocr`） | - | redis, minio |
 
 # 代码格式化
 - 用`ESLint` 与 `Prettier` 格式化代码

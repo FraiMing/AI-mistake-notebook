@@ -19,7 +19,8 @@ pnpm install
 # 2. 配置环境变量
 cp .env.example .env
 # 编辑 .env，至少修改 AUTH_SECRET（可用 openssl rand -base64 32 生成）
-# 开通 AI 功能需配置 Deepseek API
+# 图片 OCR 需配置百度云文字识别 API Key
+# AI 标注需配置 DeepSeek API Key
 
 # 3. 创建数据库并写入初始数据
 pnpm db:migrate
@@ -53,7 +54,7 @@ docker compose -f docker/docker-compose.yml stop redis minio
 ## Docker 完整部署
 
 ```bash
-# 构建并启动全部 4 个服务（app + redis + minio + ocr-worker）
+# 构建并启动全部 3 个服务（app + redis + minio）
 docker compose -f docker/docker-compose.yml up -d --build
 ```
 
@@ -86,9 +87,9 @@ docker compose -f docker/docker-compose.yml up -d --build
 | 语言 | TypeScript (strict) |
 | 认证 | Auth.js v5 (Credentials) |
 | 数据库 | SQLite (Drizzle ORM + sql.js) |
-| 队列/缓存 | Redis 7 + BullMQ |
+| 队列/缓存 | Redis 7 |
 | 存储 | MinIO (S3 兼容) |
 | AI | DeepSeek-V4 API |
-| OCR | PaddleOCR (Python worker) |
+| OCR | 百度云文字识别 API |
 | 测试 | Vitest + Playwright |
 | 部署 | Docker Compose |
