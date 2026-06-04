@@ -41,7 +41,7 @@ export const tags = sqliteTable("Tag", {
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
 });
 
-/** 题目-标签关联表（多对多） */
+/** 题目-标签关联表（多对多），source 字段区分 AI 自动标注 / 手动标注 */
 export const problemTags = sqliteTable(
   "ProblemTag",
   {
@@ -51,6 +51,9 @@ export const problemTags = sqliteTable(
     tagId: integer("tagId")
       .notNull()
       .references(() => tags.id),
+    source: text("source", { enum: ["AI", "MANUAL"] })
+      .notNull()
+      .default("MANUAL"),
   },
   (table) => ({
     pk: primaryKey({ columns: [table.problemId, table.tagId] }),

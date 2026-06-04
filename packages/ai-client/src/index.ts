@@ -13,5 +13,7 @@ export function getAIClient(): OpenAI {
   return client;
 }
 
-/** 占位：后续步骤实现具体 AI 调用 */
-export { getAIClient as default };
+export { autoTagProblem } from "./tagging.js";
+export type { AutoTagResult } from "./tagging.js";
+export { AutoTaggingError } from "./tagging.js";
+export { SYSTEM_PROMPT, buildTaggingUserMessage } from "./prompts/tagging.js";

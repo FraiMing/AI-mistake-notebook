@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { X, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
-type Tag = { id: number; name: string; type: string };
+type Tag = { id: number; name: string; type: string; source?: "AI" | "MANUAL" };
 type TagType = "SUBJECT" | "KNOWLEDGE_POINT" | "ERROR_REASON";
 type SelectedMap = Record<TagType, Tag[]>;
 
@@ -18,6 +18,14 @@ const TYPE_LABEL: Record<TagType, string> = {
   KNOWLEDGE_POINT: "知识点",
   ERROR_REASON: "错因",
 };
+
+/** 根据 source 返回 Chip 样式类名 */
+function chipClass(source?: string) {
+  if (source === "AI") {
+    return "border-blue-300 bg-blue-50 text-blue-700";
+  }
+  return "bg-primary/10 text-primary";
+}
 
 export function TagSelector({ selected, onChange }: Props) {
   const [openType, setOpenType] = useState<TagType | null>(null);
@@ -64,7 +72,10 @@ export function TagSelector({ selected, onChange }: Props) {
         <div className="flex flex-wrap gap-1">
           {allSelected.map((t) => (
             <span key={t.id}
-              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${chipClass(t.source)}`}>
+              {t.source === "AI" && (
+                <span className="text-[10px] font-medium opacity-70">AI</span>
+              )}
               {t.name}
               <button onClick={() => removeTag(t.type as TagType, t.id)}>
                 <X className="h-3 w-3" />

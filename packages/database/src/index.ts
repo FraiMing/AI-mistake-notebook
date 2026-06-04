@@ -40,7 +40,14 @@ function ensureTables(db: import("sql.js").Database) {
   db.run(`CREATE TABLE IF NOT EXISTS "User" ("id" integer PRIMARY KEY AUTOINCREMENT, "username" text NOT NULL UNIQUE, "passwordHash" text NOT NULL, "createdAt" integer NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS "Problem" ("id" integer PRIMARY KEY AUTOINCREMENT, "userId" integer NOT NULL REFERENCES "User"("id"), "content" text NOT NULL, "answer" text NOT NULL, "imageKey" text, "zone" text NOT NULL DEFAULT 'TEMPORARY', "masteryScore" real NOT NULL DEFAULT 50, "createdAt" integer NOT NULL, "updatedAt" integer NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS "Tag" ("id" integer PRIMARY KEY AUTOINCREMENT, "name" text NOT NULL, "type" text NOT NULL, "userId" integer NOT NULL REFERENCES "User"("id"), "createdAt" integer NOT NULL)`);
-  db.run(`CREATE TABLE IF NOT EXISTS "ProblemTag" ("problemId" integer NOT NULL REFERENCES "Problem"("id"), "tagId" integer NOT NULL REFERENCES "Tag"("id"), PRIMARY KEY ("problemId", "tagId"))`);
+  db.run(`CREATE TABLE IF NOT EXISTS "ProblemTag" ("problemId" integer NOT NULL REFERENCES "Problem"("id"), "tagId" integer NOT NULL REFERENCES "Tag"("id"), "source" text NOT NULL DEFAULT 'MANUAL', PRIMARY KEY ("problemId", "tagId"))`);
+  
+  // 迁移旧表：如果 ProblemTag 表没有 source 列，追加
+  try {
+    db.run("ALTER TABLE ProblemTag ADD COLUMN source TEXT NOT NULL DEFAULT 'MANUAL'");
+  } catch {
+    // 列已存在，忽略
+  }
 }
 
 export function saveDb() {

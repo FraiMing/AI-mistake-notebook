@@ -6,7 +6,7 @@ import Link from "next/link";
 import { X, Maximize2 } from "lucide-react";
 import { useTagFilterStore } from "@/stores/tag-filter-store";
 
-type Tag = { id: number; name: string; type: string };
+type Tag = { id: number; name: string; type: string; source?: string };
 type TagType = "SUBJECT" | "KNOWLEDGE_POINT" | "ERROR_REASON";
 
 interface Problem {
@@ -19,6 +19,12 @@ interface Problem {
 }
 
 const TYPE_LABEL: Record<TagType, string> = { SUBJECT: "学科", KNOWLEDGE_POINT: "知识点", ERROR_REASON: "错因" };
+
+/** 根据 source 返回标签 Chip 样式 */
+function tagChipClass(source?: string) {
+  if (source === "AI") return "inline-flex rounded-full border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs text-blue-700";
+  return "inline-flex rounded-full bg-muted px-2 py-0.5 text-xs";
+}
 
 /** 图片缩略图组件（含点击放大） */
 function ProblemImage({ imageKey }: { imageKey: string }) {
@@ -108,7 +114,7 @@ export default function ProblemsPage() {
   });
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">加载中…</div>;
+    return <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">加载中...</div>;
   }
 
   if (!problems || problems.length === 0) {
@@ -137,7 +143,7 @@ export default function ProblemsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold">
-          错题本 <span className="ml-2 text-sm font-normal text-muted-foreground">({problems.length} 题)</span>
+          错题本<span className="ml-2 text-sm font-normal text-muted-foreground">({problems.length} 题)</span>
         </h2>
         <Link href="/problems/new" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">录入错题</Link>
       </div>
@@ -187,7 +193,10 @@ export default function ProblemsPage() {
               {p.tags && p.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {p.tags.map((t) => (
-                    <span key={t.id} className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs">
+                    <span key={t.id} className={tagChipClass(t.source)}>
+                      {t.source === "AI" && (
+                        <span className="text-[10px] font-medium text-blue-400 mr-0.5">AI</span>
+                      )}
                       {t.name}
                     </span>
                   ))}

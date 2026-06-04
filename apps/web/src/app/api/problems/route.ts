@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth";
 import { initDb, problems, problemTags, tags } from "@ai-notebook/database";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -17,15 +16,18 @@ export async function GET(request: Request) {
     const allProblems = db.select().from(problems).all()
       .filter((p) => p.userId === userId);
 
-    // 查询所有关联
+    // 查询所有关联及标签
     const allPT = db.select().from(problemTags).all();
     const allTags = db.select().from(tags).all();
 
-    // 为每个题目附加标签
+    // 为每个题目附加标签（含 source 信息）
     let result = allProblems.map((p) => {
       const ptRows = allPT.filter((pt) => pt.problemId === p.id);
       const tagRows = ptRows
-        .map((pt) => allTags.find((t) => t.id === pt.tagId))
+        .map((pt) => {
+          const tag = allTags.find((t) => t.id === pt.tagId);
+          return tag ? { ...tag, source: pt.source } : null;
+        })
         .filter(Boolean);
       return { ...p, tags: tagRows };
     });

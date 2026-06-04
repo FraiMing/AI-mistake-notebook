@@ -6,7 +6,9 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { uploadImage } from "@/lib/minio-client";
+import { suggestTags } from "@/lib/ai-tagging-action";
 import { randomUUID } from "crypto";
+import type { TagSuggestion } from "@/lib/ai-tagging-action";
 
 const createProblemSchema = z.object({
   content: z.string({ required_error: "题目内容不能为空" }).min(1, "题目内容不能为空").max(5000, "题目内容不能超过 5000 个字符"),
@@ -15,7 +17,13 @@ const createProblemSchema = z.object({
 
 export type CreateProblemInput = z.infer<typeof createProblemSchema>;
 
-export async function createProblem(formData: FormData) {
+export type CreateProblemResult = {
+  error?: string;
+  problemId?: number;
+  aiSuggestions?: TagSuggestion[] | null;
+};
+
+export async function createProblem(formData: FormData): Promise<CreateProblemResult> {
   const session = await auth();
   if (!session?.user?.id) return { error: "未登录" };
 
@@ -23,7 +31,7 @@ export async function createProblem(formData: FormData) {
   const parsed = createProblemSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "表单数据无效" };
 
-  // 解析 tagIds
+  // 解析 tagIds（手动选择的标签，确认阶段写入）
   const tagIdsRaw = formData.get("tagIds");
   const tagIds =
     typeof tagIdsRaw === "string" && tagIdsRaw.length > 0
@@ -33,6 +41,8 @@ export async function createProblem(formData: FormData) {
   // 解析 imageKey（可选）
   const imageKeyRaw = formData.get("imageKey");
   const imageKey = typeof imageKeyRaw === "string" && imageKeyRaw.length > 0 ? imageKeyRaw : null;
+
+  let newProblemId = 0;
 
   try {
     const db = await initDb();
@@ -49,17 +59,13 @@ export async function createProblem(formData: FormData) {
       updatedAt: now,
     }).run();
 
-    // 2. 获取刚插入的题目 ID（通过查最新一条）
+    // 2. 获取刚插入的题目 ID
     const allProblems = db.select().from(problems).all();
     const myProblems = allProblems.filter((p) => p.userId === userId);
-    const newProblemId = myProblems.length > 0 ? Math.max(...myProblems.map((p) => p.id)) : 0;
+    newProblemId = myProblems.length > 0 ? Math.max(...myProblems.map((p) => p.id)) : 0;
 
-    // 3. 关联标签（必须在 saveDb 之前，保证同一实例）
-    if (newProblemId > 0 && tagIds.length > 0) {
-      for (const tagId of tagIds) {
-        db.insert(problemTags).values({ problemId: newProblemId, tagId }).run();
-      }
-    }
+    // 3. 关联手动选择的标签（暂不写入——统一走 confirmTags 确认阶段）
+    // 手动标签在确认阶段由前端调用 confirmTags 写入
 
     // 4. 统一持久化
     saveDb();
@@ -69,10 +75,21 @@ export async function createProblem(formData: FormData) {
   }
 
   revalidatePath("/problems");
-  redirect("/problems");
+
+  // 5. AI 自动标注（异步但同步等待，最多 30s）
+  let aiSuggestions: TagSuggestion[] | null = null;
+  if (newProblemId > 0) {
+    try {
+      aiSuggestions = await suggestTags(newProblemId);
+    } catch {
+      // 降级：不阻塞返回
+    }
+  }
+
+  return { problemId: newProblemId, aiSuggestions };
 }
 
-/** 上传图片 Server Action — 接收 FormData，上传到 MinIO 并返回 imageKey */
+/** 上传图片 Server Action —— 接收 FormData，上传到 MinIO 并返回 imageKey */
 export async function uploadProblemImage(formData: FormData): Promise<{ imageKey?: string; error?: string }> {
   const session = await auth();
   if (!session?.user?.id) return { error: "未登录" };
