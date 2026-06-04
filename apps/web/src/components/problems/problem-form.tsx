@@ -5,8 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { createProblem } from "@/lib/problem-actions";
-import { confirmTags } from "@/lib/ai-tagging-action";
+import { analyzeProblem, saveProblem } from "@/lib/problem-actions";
+
 import { TagSelector } from "@/components/tags/tag-selector";
 import { ImagePlus, Loader2, X, Sparkles, AlertCircle } from "lucide-react";
 import type { TagSuggestion } from "@/lib/ai-tagging-action";
@@ -66,6 +66,7 @@ export function ProblemForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState<"form" | "ai-loading" | "confirm">("form");
+  const [formData, setFormData] = useState<{ content: string; answer: string }>({ content: "", answer: "" });
   const [selectedTags, setSelectedTags] = useState<SelectedMap>({
     SUBJECT: [], KNOWLEDGE_POINT: [], ERROR_REASON: [],
   });
@@ -163,15 +164,12 @@ export function ProblemForm() {
       setStep("ai-loading");
       setAiError(false);
 
-      const result = await createProblem(formData);
+      setFormData({ content: data.content, answer: data.answer });
+      const result = await analyzeProblem(formData);
       if (result?.error) {
         setError("root", { message: result.error });
         setStep("form");
         return;
-      }
-
-      if (result.problemId) {
-        setProblemId(result.problemId);
       }
 
       if (result.aiSuggestions && result.aiSuggestions.length > 0) {
@@ -185,7 +183,7 @@ export function ProblemForm() {
   }
 
   function handleConfirm() {
-    if (!problemId) return;
+    if (!formData.content) return;
 
     startTransition(async () => {
       const entries: { tagId: number; source: "AI" | "MANUAL" }[] = [];
@@ -204,7 +202,8 @@ export function ProblemForm() {
         }
       }
 
-      const result = await confirmTags(problemId, entries);
+      const input = { content: formData.content, answer: formData.answer, imageKey: imageKey, tagEntries: entries };
+      const result = await saveProblem(input);
       if (result?.error) {
         setError("root", { message: result.error });
         return;
@@ -372,7 +371,7 @@ export function ProblemForm() {
 
       <button type="submit" disabled={isPending}
         className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity">
-        {isPending ? "保存中..." : "保存"}
+        {isPending ? "分析中..." : "下一步"}
       </button>
     </form>
   );
