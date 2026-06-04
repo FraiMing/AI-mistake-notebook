@@ -5,6 +5,9 @@ import { initDb, saveDb, problems, problemTags } from "@ai-notebook/database";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { uploadImage } from "@/lib/minio-client";
+import { addOcrJob } from "@/lib/ocr-queue";
+import { randomUUID } from "crypto";
 
 const createProblemSchema = z.object({
   content: z.string({ required_error: "题目内容不能为空" }).min(1, "题目内容不能为空").max(5000, "题目内容不能超过 5000 个字符"),
@@ -28,6 +31,10 @@ export async function createProblem(formData: FormData) {
       ? tagIdsRaw.split(",").map(Number).filter((n) => !isNaN(n))
       : [];
 
+  // 解析 imageKey（可选）
+  const imageKeyRaw = formData.get("imageKey");
+  const imageKey = typeof imageKeyRaw === "string" && imageKeyRaw.length > 0 ? imageKeyRaw : null;
+
   try {
     const db = await initDb();
     const now = new Date();
@@ -38,6 +45,7 @@ export async function createProblem(formData: FormData) {
       userId,
       content: parsed.data.content,
       answer: parsed.data.answer,
+      imageKey: imageKey ?? undefined,
       createdAt: now,
       updatedAt: now,
     }).run();
@@ -63,4 +71,46 @@ export async function createProblem(formData: FormData) {
 
   revalidatePath("/problems");
   redirect("/problems");
+}
+
+/** 上传图片 Server Action — 接收 FormData，上传到 MinIO 并返回 imageKey */
+export async function uploadProblemImage(formData: FormData): Promise<{ imageKey?: string; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "未登录" };
+
+  const file = formData.get("file") as File | null;
+  if (!file) return { error: "未上传文件" };
+
+  // 校验文件类型
+  if (file.type !== "image/jpeg" && file.type !== "image/png") {
+    return { error: "仅支持 JPG 和 PNG 格式" };
+  }
+
+  // 校验文件大小（10MB）
+  const MAX_SIZE = 10 * 1024 * 1024;
+  if (file.size > MAX_SIZE) {
+    return { error: "图片大小不能超过 10MB" };
+  }
+
+  try {
+    const userId = session.user.id;
+    const ext = file.type === "image/png" ? "png" : "jpg";
+    const imageKey = `problems/${userId}/${randomUUID()}.${ext}`;
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await uploadImage(buffer, imageKey);
+
+    // 触发 OCR 任务
+    try {
+      await addOcrJob(imageKey);
+    } catch (e) {
+      console.error("OCR 任务投递失败:", e);
+      // 不阻塞上传流程——用户仍可手动输入
+    }
+
+    return { imageKey };
+  } catch (e) {
+    console.error("图片上传失败:", e);
+    return { error: "图片上传失败，请稍后重试" };
+  }
 }
