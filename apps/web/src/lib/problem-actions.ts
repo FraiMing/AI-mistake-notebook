@@ -99,14 +99,6 @@ export async function uploadProblemImage(formData: FormData): Promise<{ imageKey
     const buffer = Buffer.from(await file.arrayBuffer());
     await uploadImage(buffer, imageKey);
 
-    // 触发 OCR 任务
-    try {
-      await addOcrJob(imageKey);
-    } catch (e) {
-      console.error("OCR 任务投递失败:", e);
-      // 不阻塞上传流程——用户仍可手动输入
-    }
-
     return { imageKey };
   } catch (e) {
     console.error("图片上传失败:", e);
