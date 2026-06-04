@@ -1,5 +1,5 @@
-import { getAIClient } from "./index.js";
-import { SYSTEM_PROMPT, buildTaggingUserMessage } from "./prompts/tagging.js";
+import { getAIClient } from "./index";
+import { SYSTEM_PROMPT, buildTaggingUserMessage } from "./prompts/tagging";
 
 /** AI 标签建议结果 */
 export interface AutoTagResult {

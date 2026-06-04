@@ -13,8 +13,15 @@ export async function GET(request: Request) {
     const userId = Number(session.user.id);
 
     // 查询所有题目
-    const allProblems = db.select().from(problems).all()
+    let allProblems = db.select().from(problems).all()
       .filter((p) => p.userId === userId);
+
+    // zone 筛选（可选参数）
+    const { searchParams } = new URL(request.url);
+    const zoneParam = searchParams.get("zone");
+    if (zoneParam === "TEMPORARY" || zoneParam === "ARCHIVED") {
+      allProblems = allProblems.filter((p) => p.zone === zoneParam);
+    }
 
     // 查询所有关联及标签
     const allPT = db.select().from(problemTags).all();
@@ -32,8 +39,7 @@ export async function GET(request: Request) {
       return { ...p, tags: tagRows };
     });
 
-    // 筛选
-    const { searchParams } = new URL(request.url);
+    // 标签筛选
     const tagIdsParam = searchParams.get("tagIds");
     if (tagIdsParam) {
       const filterIds = tagIdsParam.split(",").map(Number).filter((n) => !isNaN(n));
