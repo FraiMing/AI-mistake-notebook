@@ -1,4 +1,10 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  primaryKey,
+} from "drizzle-orm/sqlite-core";
 
 /** 用户表 */
 export const users = sqliteTable("User", {
@@ -22,3 +28,31 @@ export const problems = sqliteTable("Problem", {
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull(),
 });
+
+/** 标签表 */
+export const tags = sqliteTable("Tag", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  type: text("type", { enum: ["SUBJECT", "KNOWLEDGE_POINT", "ERROR_REASON"] })
+    .notNull(),
+  userId: integer("userId")
+    .notNull()
+    .references(() => users.id),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
+});
+
+/** 题目-标签关联表（多对多） */
+export const problemTags = sqliteTable(
+  "ProblemTag",
+  {
+    problemId: integer("problemId")
+      .notNull()
+      .references(() => problems.id),
+    tagId: integer("tagId")
+      .notNull()
+      .references(() => tags.id),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.problemId, table.tagId] }),
+  })
+);

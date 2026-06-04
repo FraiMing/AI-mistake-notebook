@@ -1,54 +1,27 @@
-import type { SQLJsDatabase } from "drizzle-orm/sql-js";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "../drizzle/schema";
-import * as fs from "node:fs";
 import * as path from "node:path";
+import * as fs from "node:fs";
 
-let _db: SQLJsDatabase<typeof schema> | null = null;
-let _sqlJsDb: import("sql.js").Database | null = null;
-let _dbPath = "";
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
-export async function initDb(
-  forceReload = false
-): Promise<SQLJsDatabase<typeof schema>> {
-  if (_db && !forceReload) return _db;
+export function initDb() {
+  if (_db) return _db;
 
-  const [initSqlJsMod, { drizzle }] = await Promise.all([
-    import("sql.js"),
-    import("drizzle-orm/sql-js"),
-  ]);
-
-  const initSqlJs = initSqlJsMod.default;
-
-  _dbPath = path.resolve(
-    (process.env.DATABASE_URL ?? "file:./data/ai-notebook.db").replace(
-      "file:",
-      ""
-    )
+  const dbPath = path.resolve(
+    (process.env.DATABASE_URL ?? "file:./data/ai-notebook.db").replace("file:", "")
   );
 
-  const wasmPath = path.resolve(process.cwd(), "public/sql-wasm.wasm");
-  const SQL = await initSqlJs({
-    locateFile: () => wasmPath,
-  });
-  const dir = path.dirname(_dbPath);
+  const dir = path.dirname(dbPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  if (fs.existsSync(_dbPath)) {
-    _sqlJsDb = new SQL.Database(fs.readFileSync(_dbPath));
-  } else {
-    _sqlJsDb = new SQL.Database();
-  }
+  const sqlite = new Database(dbPath);
+  sqlite.pragma("journal_mode = WAL");
 
-  _db = drizzle(_sqlJsDb, { schema });
+  _db = drizzle(sqlite, { schema });
   return _db;
 }
 
-export function saveDb() {
-  if (!_sqlJsDb || !_dbPath) return;
-  const dir = path.dirname(_dbPath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(_dbPath, Buffer.from(_sqlJsDb.export()));
-}
-
-export { eq, desc } from "drizzle-orm";
+export { eq, desc, and, inArray } from "drizzle-orm";
 export * from "../drizzle/schema";

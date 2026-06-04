@@ -1,4 +1,4 @@
-{
+﻿{
     "extends":  "../../configs/tsconfig.base.json",
     "compilerOptions":  {
                             "outDir":  "dist",
@@ -27,6 +27,7 @@
                 ],
     "exclude":  [
                     "node_modules",
-                    "e2e"
+                    "e2e",
+                    "../../packages"
                 ]
 }

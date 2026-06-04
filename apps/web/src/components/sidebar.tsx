@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { FileText, BookOpen, Bell, MessageSquare } from "lucide-react";
+import { FileText, BookOpen, Bell, MessageSquare, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/problems", label: "错题本", icon: BookOpen },
   { href: "/problems/new", label: "录入错题", icon: FileText },
+  { href: "/tags", label: "标签管理", icon: Tag },
   { href: "/messages", label: "复习消息", icon: Bell },
   { href: "/review", label: "开始复习", icon: MessageSquare },
 ];

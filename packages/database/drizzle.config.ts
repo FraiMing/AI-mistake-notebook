@@ -4,4 +4,7 @@ export default defineConfig({
   schema: "./drizzle/schema.ts",
   out: "./drizzle/migrations",
   dialect: "sqlite",
+  dbCredentials: {
+    url: process.env.DATABASE_URL ?? "file:./data/ai-notebook.db",
+  },
 });

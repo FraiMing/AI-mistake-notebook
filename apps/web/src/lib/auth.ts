@@ -1,4 +1,4 @@
-﻿import NextAuth from "next-auth";
+import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { eq } from "@ai-notebook/database";
@@ -15,7 +15,7 @@ const result = NextAuth({
         password: { label: "密码", type: "password" },
       },
       async authorize(credentials) {
-        const db = await initDb();
+        const db = initDb();
         const { username, password } = credentials as {
           username: string;
           password: string;
