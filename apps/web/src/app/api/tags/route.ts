@@ -9,7 +9,7 @@ export async function GET() {
     return NextResponse.json({ error: "未登录" }, { status: 401 });
   }
 
-  const db = initDb();
+  const db = await initDb();
   const rows = db
     .select()
     .from(tags)

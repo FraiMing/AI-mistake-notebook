@@ -15,7 +15,7 @@ const result = NextAuth({
         password: { label: "密码", type: "password" },
       },
       async authorize(credentials) {
-        const db = initDb();
+        const db = await initDb();
         const { username, password } = credentials as {
           username: string;
           password: string;

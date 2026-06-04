@@ -1,33 +1,28 @@
-﻿{
-    "extends":  "../../configs/tsconfig.base.json",
-    "compilerOptions":  {
-                            "outDir":  "dist",
-                            "rootDir":  ".",
-                            "paths":  {
-                                          "@/*":  [
-                                                      "./src/*"
-                                                  ]
-                                      },
-                            "plugins":  [
-                                            {
-                                                "name":  "next"
-                                            }
-                                        ],
-                            "allowJs":  true,
-                            "noEmit":  true,
-                            "incremental":  true,
-                            "declaration":  false,
-                            "declarationMap":  false
-                        },
-    "include":  [
-                    "next-env.d.ts",
-                    "**/*.ts",
-                    "**/*.tsx",
-                    ".next/types/**/*.ts"
-                ],
-    "exclude":  [
-                    "node_modules",
-                    "e2e",
-                    "../../packages"
-                ]
+{
+  "extends": "../../configs/tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "plugins": [
+      { "name": "next" }
+    ],
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "e2e"
+  ]
 }
