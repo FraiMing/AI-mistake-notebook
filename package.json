@@ -1,0 +1,22 @@
+{
+  "name": "ai-error-notebook",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @ai-notebook/web dev",
+    "build": "pnpm --filter @ai-notebook/web build",
+    "test": "pnpm --filter @ai-notebook/web test",
+    "test:e2e": "pnpm --filter @ai-notebook/web test:e2e",
+    "db:generate": "pnpm --filter @ai-notebook/database db:generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

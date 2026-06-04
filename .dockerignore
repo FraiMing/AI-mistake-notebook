@@ -1,0 +1,16 @@
+﻿node_modules/
+.next/
+.git/
+.venv/
+*.db
+*.log
+.env
+.env.*
+coverage/
+test-results/
+
+# 开发文档
+开发范围裁剪方案.md
+AGENTS.md
+流程图.png
+PRD.md

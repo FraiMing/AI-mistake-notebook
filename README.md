@@ -19,7 +19,7 @@ pnpm install
 # 2. 配置环境变量
 cp .env.example .env
 # 编辑 .env，至少修改 AUTH_SECRET（可用 openssl rand -base64 32 生成）
-# DEEPSEEK_API_KEY 暂可不填，AI 功能未实现前不影响启动
+# 开通 AI 功能需配置 Deepseek API
 
 # 3. 创建数据库并写入初始数据
 pnpm db:migrate

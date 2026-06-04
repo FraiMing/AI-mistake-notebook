@@ -265,8 +265,8 @@ workers/ocr (Python — 独立，通过 Redis 与 apps/web 通信)
 
 # 回滚安全
 - 在对仓库进行任何代码修改之后，必须进行 git add 与 git commit 提交
+- 若权限受限无法提交 git add 与 git commit，通知开发者手动提交并给予相应命令。
 - 当开发出现失控，利用 git 与 /undo命令 回滚，保障开发流程稳定性
-
 
 
 

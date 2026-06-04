@@ -1,0 +1,12 @@
+{
+  "name": "@ai-notebook/shared-types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "devDependencies": {    "typescript": "^5.7.0"
+  }
+}
+

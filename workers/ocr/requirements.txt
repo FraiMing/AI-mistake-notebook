@@ -1,0 +1,4 @@
+﻿paddlepaddle==3.0.0
+paddleocr==2.9.0
+redis==5.2.0
+minio==7.2.0
