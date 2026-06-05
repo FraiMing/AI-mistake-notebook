@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+﻿import { auth } from "@/lib/auth";
 import { initDb, problems, problemTags, tags } from "@ai-notebook/database";
 import { NextResponse } from "next/server";
 
@@ -12,52 +12,72 @@ export async function GET(request: Request) {
     const db = await initDb();
     const userId = Number(session.user.id);
 
-    // 查询所有题目
     let allProblems = db.select().from(problems).all()
       .filter((p) => p.userId === userId);
 
-    // zone 筛选（可选参数）
     const { searchParams } = new URL(request.url);
     const zoneParam = searchParams.get("zone");
     if (zoneParam === "TEMPORARY" || zoneParam === "ARCHIVED") {
       allProblems = allProblems.filter((p) => p.zone === zoneParam);
     }
 
-    // 查询所有关联及标签
     const allPT = db.select().from(problemTags).all();
     const allTags = db.select().from(tags).all();
 
-    // 为每个题目附加标签（含 source 信息）
-    let result = allProblems.map((p) => {
+    const result: any[] = allProblems.map((p) => {
       const ptRows = allPT.filter((pt) => pt.problemId === p.id);
       const tagRows = ptRows
         .map((pt) => {
           const tag = allTags.find((t) => t.id === pt.tagId);
-          return tag ? { ...tag, source: pt.source } : null;
+          if (!tag) return null;
+          const source = pt.source ?? "MANUAL";
+          return { id: tag.id, name: tag.name, type: tag.type, source };
         })
         .filter(Boolean);
       return { ...p, tags: tagRows };
     });
 
-    // 标签筛选
     const tagIdsParam = searchParams.get("tagIds");
     if (tagIdsParam) {
       const filterIds = tagIdsParam.split(",").map(Number).filter((n) => !isNaN(n));
       if (filterIds.length > 0) {
-        result = result.filter((p) =>
+        const filtered = result.filter((p: any) =>
           filterIds.every((fid) =>
-            (p.tags as typeof allTags).some((t) => t && t.id === fid)
+            (p.tags ?? []).some((t: any) => t && t.id === fid)
           )
         );
+        filtered.sort((a: any, b: any) => {
+          const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt);
+          const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt);
+          return tb - ta;
+        });
+
+        const pageStr = searchParams.get("page");
+        if (pageStr) {
+          const page = Math.max(1, parseInt(pageStr) || 1);
+          const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit")!) || 20));
+          const total = filtered.length;
+          const start = (page - 1) * limit;
+          return NextResponse.json({ items: filtered.slice(start, start + limit), total, page, limit });
+        }
+        return NextResponse.json(filtered);
       }
     }
 
-    // 按时间倒序
     result.sort((a, b) => {
       const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt);
       const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt);
       return tb - ta;
     });
+
+    const pageStr = searchParams.get("page");
+    if (pageStr) {
+      const page = Math.max(1, parseInt(pageStr) || 1);
+      const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit")!) || 20));
+      const total = result.length;
+      const start = (page - 1) * limit;
+      return NextResponse.json({ items: result.slice(start, start + limit), total, page, limit });
+    }
 
     return NextResponse.json(result);
   } catch (e) {

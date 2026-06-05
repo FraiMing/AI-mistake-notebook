@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { X, Maximize2, BookOpen } from "lucide-react";
+import { X, Maximize2, BookOpen, Loader2 } from "lucide-react";
 import { useTagFilterStore } from "@/stores/tag-filter-store";
 import { TimelineGroup } from "@/components/problems/timeline-group";
 
@@ -15,7 +15,15 @@ interface Problem {
   imageKey: string | null; zone: string; createdAt: number | string; tags?: Tag[];
 }
 
+interface PaginatedResult {
+  items: Problem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 const TYPE_LABEL: Record<TagType, string> = { SUBJECT: "学科", KNOWLEDGE_POINT: "知识点", ERROR_REASON: "错因" };
+const PAGE_LIMIT = 20;
 
 function tagChipClass(source?: string) {
   if (source === "AI") return "inline-flex rounded-full border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs text-blue-700";
@@ -83,27 +91,71 @@ export default function ProblemsPage() {
   const allSelectedIds = Object.values(selectedTagIds).flat();
   const hasFilter = allSelectedIds.length > 0;
 
-  const { data: allTags = [] } = useQuery<Tag[]>({ queryKey: ["tags"], queryFn: async () => { const res = await fetch("/api/tags"); return res.ok ? res.json() : []; } });
-  const tagsByType = { SUBJECT: allTags.filter((t) => t.type === "SUBJECT"), KNOWLEDGE_POINT: allTags.filter((t) => t.type === "KNOWLEDGE_POINT"), ERROR_REASON: allTags.filter((t) => t.type === "ERROR_REASON") };
+  const [page, setPage] = useState(1);
+  const accumulatedRef = useRef<Problem[]>([]);
+  const [total, setTotal] = useState(0);
+
+  // 筛选/分区变化时重置
+  useEffect(() => {
+    setPage(1);
+    accumulatedRef.current = [];
+    setTotal(0);
+  }, [activeZone, allSelectedIds.join(",")]);
+
+  const { data: allTags = [] } = useQuery<Tag[]>({
+    queryKey: ["tags"],
+    queryFn: async () => { const res = await fetch("/api/tags"); return res.ok ? res.json() : []; },
+  });
+  const tagsByType = {
+    SUBJECT: allTags.filter((t) => t.type === "SUBJECT"),
+    KNOWLEDGE_POINT: allTags.filter((t) => t.type === "KNOWLEDGE_POINT"),
+    ERROR_REASON: allTags.filter((t) => t.type === "ERROR_REASON"),
+  };
 
   const params = new URLSearchParams();
   if (activeZone) params.set("zone", activeZone);
   if (allSelectedIds.length > 0) params.set("tagIds", allSelectedIds.join(","));
-  const queryString = params.toString();
+  params.set("page", String(page));
+  params.set("limit", String(PAGE_LIMIT));
 
-  const { data: problems, isLoading } = useQuery<Problem[]>({ queryKey: ["problems", allSelectedIds.join(","), activeZone], queryFn: async () => { const res = await fetch(`/api/problems?${queryString}`); if (!res.ok) throw new Error("加载失败"); return res.json(); } });
+  const { data: paginated, isLoading } = useQuery<PaginatedResult>({
+    queryKey: ["problems", allSelectedIds.join(","), activeZone, page],
+    queryFn: async () => {
+      const res = await fetch(`/api/problems?${params.toString()}`);
+      if (!res.ok) throw new Error("加载失败");
+      return res.json();
+    },
+  });
 
-  const isFull = activeZone === "TEMPORARY" && problems && problems.length >= 50;
+  // 累加分页数据
+  useEffect(() => {
+    if (paginated?.items) {
+      if (page === 1) {
+        accumulatedRef.current = paginated.items;
+      } else {
+        const existingIds = new Set(accumulatedRef.current.map((p) => p.id));
+        for (const item of paginated.items) {
+          if (!existingIds.has(item.id)) {
+            accumulatedRef.current.push(item);
+          }
+        }
+      }
+      setTotal(paginated.total);
+    }
+  }, [paginated, page]);
 
-  if (isLoading) return <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">加载中...</div>;
+  const problems = accumulatedRef.current;
+  const hasMore = problems.length < total;
+  const isFull = activeZone === "TEMPORARY" && problems.length >= 50;
+
+  if (isLoading && page === 1) return <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">加载中...</div>;
 
   return (<div>
     <div className="flex items-center justify-between mb-4">
-      <h2 className="text-lg font-semibold">错题本{problems && problems.length > 0 && <span className="ml-2 text-sm font-normal text-muted-foreground">({problems.length} 题)</span>}</h2>
+      <h2 className="text-lg font-semibold">错题本{problems.length > 0 && <span className="ml-2 text-sm font-normal text-muted-foreground">({total} 题)</span>}</h2>
       {activeZone === "TEMPORARY" && <Link href="/problems/new" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">录入错题</Link>}
     </div>
 
-    {/* 分区 Tab */}
     <div className="mb-3 flex gap-1 border-b">
       {(["TEMPORARY", "ARCHIVED"] as const).map((z) => (
         <button key={z} onClick={() => setZone(z === "TEMPORARY" ? undefined : z)}
@@ -113,10 +165,8 @@ export default function ProblemsPage() {
       ))}
     </div>
 
-    {/* 容量提示 */}
     {isFull && (<div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">暂存区已满 (50/50)，请先复习清空后再录入新题</div>)}
 
-    {/* 筛选区域 */}
     <div className="mb-6 flex flex-wrap items-center gap-2">
       {(Object.keys(TYPE_LABEL) as TagType[]).map((type) => (<div key={type} className="flex items-center gap-1">
         <span className="text-xs text-muted-foreground">{TYPE_LABEL[type]}:</span>
@@ -128,7 +178,23 @@ export default function ProblemsPage() {
       {hasFilter && (<button onClick={clearFilters} className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"><X className="h-3 w-3" /> 清除筛选</button>)}
     </div>
 
-    <TimelineGroup items={problems ?? []} getDate={getProblemDate} renderItem={renderProblemCard}
+    <TimelineGroup items={problems} getDate={getProblemDate} renderItem={renderProblemCard}
       emptyMessage={hasFilter ? "没有找到匹配的错题" : activeZone === "ARCHIVED" ? "暂无已复习的错题" : "暂无错题"} />
+
+    {/* 加载更多 */}
+    {hasMore && (
+      <div className="mt-6 flex justify-center">
+        <button
+          onClick={() => setPage((p) => p + 1)}
+          disabled={isLoading}
+          className="inline-flex items-center gap-2 rounded-md border px-6 py-2 text-sm font-medium text-muted-foreground hover:bg-accent disabled:opacity-50"
+        >
+          {isLoading ? (<><Loader2 className="h-4 w-4 animate-spin" />加载中...</>) : "加载更多"}
+        </button>
+      </div>
+    )}
+    {!hasMore && total > 0 && (
+      <p className="mt-6 text-center text-xs text-muted-foreground">已显示全部 {total} 题</p>
+    )}
   </div>);
 }
