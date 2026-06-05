@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { signOut } from "next-auth/react";
 import { FileText, BookOpen, Bell, MessageSquare, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,18 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["messages-count"],
+    queryFn: async () => {
+      const res = await fetch("/api/messages/count");
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    refetchInterval: 30000,
+  });
+
+  const unreadCount = unreadData?.count ?? 0;
 
   return (
     <aside className="w-56 border-r bg-card flex flex-col shrink-0">
@@ -35,7 +48,12 @@ export function Sidebar() {
             )}
           >
             <Icon className="h-4 w-4 shrink-0" />
-            {label}
+            <span className="flex-1">{label}</span>
+            {href === "/messages" && unreadCount > 0 && (
+              <span className="inline-flex items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-medium text-destructive-foreground min-w-[18px]">
+                {unreadCount}
+              </span>
+            )}
           </Link>
         ))}
       </nav>

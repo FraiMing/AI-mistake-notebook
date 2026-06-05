@@ -53,8 +53,12 @@ function ensureTables(db: import("sql.js").Database) {
   }
 
   // 迁移：ReviewLog 添加 confusedText 和 similarQuestionGenerated 列
+  // 迁移：创建 Message 表
+  db.run(`CREATE TABLE IF NOT EXISTS "Message" ("id" integer PRIMARY KEY AUTOINCREMENT, "userId" integer NOT NULL REFERENCES "User"("id"), "problemId" integer NOT NULL REFERENCES "Problem"("id"), "priority" real NOT NULL, "isRead" integer NOT NULL DEFAULT 0, "createdAt" integer NOT NULL)`);
   try { db.run("ALTER TABLE ReviewLog ADD COLUMN confusedText TEXT"); } catch {}
   try { db.run("ALTER TABLE ReviewLog ADD COLUMN similarQuestionGenerated TEXT"); } catch {}
+  // 迁移：创建 Message 表
+  db.run(`CREATE TABLE IF NOT EXISTS "Message" ("id" integer PRIMARY KEY AUTOINCREMENT, "userId" integer NOT NULL REFERENCES "User"("id"), "problemId" integer NOT NULL REFERENCES "Problem"("id"), "priority" real NOT NULL, "isRead" integer NOT NULL DEFAULT 0, "createdAt" integer NOT NULL)`);
 
   // 迁移旧表：如果 ProblemTag 表没有 source 列，追加
   try {

@@ -72,3 +72,17 @@ export const reviewLogs = sqliteTable("ReviewLog", {
   confusedText: text("confusedText"),
   similarQuestionGenerated: text("similarQuestionGenerated"),
 });
+
+/** 推送消息表 */
+export const messages = sqliteTable("Message", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("userId")
+    .notNull()
+    .references(() => users.id),
+  problemId: integer("problemId")
+    .notNull()
+    .references(() => problems.id),
+  priority: real("priority").notNull(),
+  isRead: integer("isRead").notNull().default(0),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
+});

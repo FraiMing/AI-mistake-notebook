@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Check, X, Maximize2, AlertCircle, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { markReviewed } from "@/lib/zone-actions";
+import { markMessageRead } from "@/lib/push-actions";
 
 type Tag = { id: number; name: string; type: string; source?: string };
 interface Problem {
@@ -63,6 +64,7 @@ function ProblemImage({ imageKey }: { imageKey: string }) {
 export default function ReviewPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const problemId = Number(params.id);
 
   const [step, setStep] = useState<Step>("initial");
@@ -111,6 +113,12 @@ export default function ReviewPage() {
   }, [step, problem, generatedCorrectAnswer]);
 
   // 显示正确作答（AI 生成的或手动录入的）
+  // 从消息入口进入时，复习完成后标记消息已读
+  useEffect(() => {
+    if (step === "done" && searchParams.get("from") === "message") {
+      markMessageRead(problemId);
+    }
+  }, [step, problemId, searchParams]);
   const displayCorrectAnswer = problem?.correctAnswer ?? generatedCorrectAnswer;
 
   // ---- 复习确认 ----
