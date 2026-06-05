@@ -21,6 +21,8 @@ export { AutoTaggingError } from "./tagging";
 export { SYSTEM_PROMPT, buildTaggingUserMessage } from "./prompts/tagging";
 
 export { explainProblem } from "./explain";
+export { generateCorrectAnswer } from "./correct-answer";
+
 export type { ExplainInput } from "./explain";
 
 export { generateSimilarQuestion } from "./similar-question";
