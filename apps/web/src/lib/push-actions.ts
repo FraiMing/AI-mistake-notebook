@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import {
   initDb, saveDb,
   problems, messages, tags, problemTags, reviewLogs,
-  eq, and,
+  eq, and, inArray,
 } from "@ai-notebook/database";
 
 const DAY_MS = 86400000;
@@ -23,11 +23,20 @@ export async function computeAndPush(): Promise<{ created: number; error?: strin
     const userId = Number(session.user.id);
     const now = Date.now();
 
-    const allProblems = db.select().from(problems).all().filter((p) => p.userId === userId);
-    const allPT = db.select().from(problemTags).all();
-    const allTags = db.select().from(tags).all();
-    const allRL = db.select().from(reviewLogs).all();
-    const allMsgs = db.select().from(messages).all().filter((m) => m.userId === userId);
+    const allProblems = db.select().from(problems).where(eq(problems.userId, userId)).all();
+    const problemIds = allProblems.map((p) => p.id);
+
+    const allPT = problemIds.length > 0
+      ? db.select().from(problemTags).where(inArray(problemTags.problemId, problemIds)).all()
+      : [];
+    const tagIdsFromPT = [...new Set(allPT.map((pt) => pt.tagId))];
+    const allTags = tagIdsFromPT.length > 0
+      ? db.select().from(tags).where(inArray(tags.id, tagIdsFromPT)).all()
+      : [];
+    const allRL = problemIds.length > 0
+      ? db.select().from(reviewLogs).where(inArray(reviewLogs.problemId, problemIds)).all()
+      : [];
+    const allMsgs = db.select().from(messages).where(eq(messages.userId, userId)).all();
 
     const enriched = allProblems.map((p) => {
       const ptRows = allPT.filter((pt) => pt.problemId === p.id);
@@ -115,7 +124,7 @@ export async function computeAndPush(): Promise<{ created: number; error?: strin
     saveDb();
     return { created };
   } catch (e) {
-    console.error("推送计算失败:", e);
+    console.error("推送计算失败", e);
     return { created: 0, error: String(e) };
   }
 }

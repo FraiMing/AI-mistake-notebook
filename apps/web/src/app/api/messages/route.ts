@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { initDb, messages, problems, problemTags, tags } from "@ai-notebook/database";
+import { initDb, messages, problems, problemTags, tags, eq, and, inArray } from "@ai-notebook/database";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -10,13 +10,22 @@ export async function GET() {
     const db = await initDb();
     const userId = Number(session.user.id);
 
-    const allMsgs = db.select().from(messages).all()
-      .filter((m) => m.userId === userId && !m.isRead)
+    const allMsgs = db.select().from(messages)
+      .where(and(eq(messages.userId, userId), eq(messages.isRead, 0)))
+      .all()
       .sort((a, b) => b.priority - a.priority);
 
-    const allProblems = db.select().from(problems).all();
-    const allPT = db.select().from(problemTags).all();
-    const allTags = db.select().from(tags).all();
+    const problemIds = [...new Set(allMsgs.map((m) => m.problemId))];
+    const allProblems = problemIds.length > 0
+      ? db.select().from(problems).where(inArray(problems.id, problemIds)).all()
+      : [];
+    const allPT = problemIds.length > 0
+      ? db.select().from(problemTags).where(inArray(problemTags.problemId, problemIds)).all()
+      : [];
+    const tagIds = [...new Set(allPT.map((pt) => pt.tagId))];
+    const allTags = tagIds.length > 0
+      ? db.select().from(tags).where(inArray(tags.id, tagIds)).all()
+      : [];
 
     const result = allMsgs.map((msg) => {
       const p = allProblems.find((pr) => pr.id === msg.problemId);

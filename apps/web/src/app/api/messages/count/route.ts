@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { initDb, messages } from "@ai-notebook/database";
+import { initDb, messages, eq, and } from "@ai-notebook/database";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -8,10 +8,12 @@ export async function GET() {
   try {
     const db = await initDb();
     const userId = Number(session.user.id);
-    const count = db.select().from(messages).all()
-      .filter((m) => m.userId === userId && !m.isRead).length;
+    const count = db.select().from(messages)
+      .where(and(eq(messages.userId, userId), eq(messages.isRead, 0)))
+      .all().length;
     return NextResponse.json({ count });
-  } catch {
+  } catch (e) {
+    console.error("/api/messages/count 错误:", e);
     return NextResponse.json({ count: 0 });
   }
 }

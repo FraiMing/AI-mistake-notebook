@@ -27,7 +27,7 @@ export async function analyzeProblem(formData: FormData): Promise<AnalyzeResult>
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "表单数据无效" };
 
   let aiSuggestions: TagSuggestion[] | null = null;
-  try { aiSuggestions = await suggestTags(parsed.data.content, parsed.data.answer); } catch {}
+  try { aiSuggestions = await suggestTags(parsed.data.content, parsed.data.answer); } catch (e) { console.error("AI 标注失败:", e); }
   return { aiSuggestions };
 }
 
@@ -50,14 +50,15 @@ export async function saveProblem(input: SaveProblemInput): Promise<{ error?: st
     const db = await initDb();
     const now = new Date();
     const userId = Number(session.user.id);
-    db.insert(problems).values({
+
+    const result = db.insert(problems).values({
       userId, content: parsed.data.content, answer: parsed.data.answer,
       correctAnswer: input.correctAnswer ?? undefined,
       imageKey: input.imageKey ?? undefined, createdAt: now, updatedAt: now,
-    }).run();
-    const allP = db.select().from(problems).all().filter((p) => p.userId === userId);
-    const newProblemId = allP.length > 0 ? Math.max(...allP.map((p) => p.id)) : 0;
-    if (newProblemId > 0 && input.tagEntries.length > 0) {
+    }).returning({ id: problems.id }).get();
+
+    const newProblemId = result?.id;
+    if (newProblemId && input.tagEntries.length > 0) {
       for (const { tagId, source } of input.tagEntries) {
         db.insert(problemTags).values({ problemId: newProblemId, tagId, source }).run();
       }

@@ -1,5 +1,5 @@
-﻿import { auth } from "@/lib/auth";
-import { initDb, problems, problemTags, tags } from "@ai-notebook/database";
+import { auth } from "@/lib/auth";
+import { initDb, problems, problemTags, tags, eq, and, inArray, desc } from "@ai-notebook/database";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -11,18 +11,51 @@ export async function GET(request: Request) {
   try {
     const db = await initDb();
     const userId = Number(session.user.id);
-
-    let allProblems = db.select().from(problems).all()
-      .filter((p) => p.userId === userId);
-
     const { searchParams } = new URL(request.url);
     const zoneParam = searchParams.get("zone");
+    const tagIdsParam = searchParams.get("tagIds");
+    const pageStr = searchParams.get("page");
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit")!) || 20));
+
+    let query = db.select().from(problems).where(eq(problems.userId, userId));
+
     if (zoneParam === "TEMPORARY" || zoneParam === "ARCHIVED") {
-      allProblems = allProblems.filter((p) => p.zone === zoneParam);
+      query = query.where(eq(problems.zone, zoneParam));
     }
 
-    const allPT = db.select().from(problemTags).all();
-    const allTags = db.select().from(tags).all();
+    if (tagIdsParam) {
+      const filterIds = tagIdsParam.split(",").map(Number).filter((n) => !isNaN(n));
+      if (filterIds.length > 0) {
+        const matchingPT = db.select().from(problemTags).where(inArray(problemTags.tagId, filterIds)).all();
+        const matchingProblemIds = [...new Set(matchingPT.map((pt) => pt.problemId))];
+        if (matchingProblemIds.length > 0) {
+          query = query.where(inArray(problems.id, matchingProblemIds));
+        } else {
+          query = query.where(eq(problems.id, -1));
+        }
+      }
+    }
+
+    query = query.orderBy(desc(problems.createdAt));
+
+    const total = query.all().length;
+
+    if (pageStr) {
+      const page = Math.max(1, parseInt(pageStr) || 1);
+      const offset = (page - 1) * limit;
+      query = query.limit(limit).offset(offset);
+    }
+
+    const allProblems = query.all();
+
+    const problemIds = allProblems.map((p) => p.id);
+    const allPT = problemIds.length > 0
+      ? db.select().from(problemTags).where(inArray(problemTags.problemId, problemIds)).all()
+      : [];
+    const tagIds = [...new Set(allPT.map((pt) => pt.tagId))];
+    const allTags = tagIds.length > 0
+      ? db.select().from(tags).where(inArray(tags.id, tagIds)).all()
+      : [];
 
     const result: any[] = allProblems.map((p) => {
       const ptRows = allPT.filter((pt) => pt.problemId === p.id);
@@ -37,49 +70,7 @@ export async function GET(request: Request) {
       return { ...p, tags: tagRows };
     });
 
-    const tagIdsParam = searchParams.get("tagIds");
-    if (tagIdsParam) {
-      const filterIds = tagIdsParam.split(",").map(Number).filter((n) => !isNaN(n));
-      if (filterIds.length > 0) {
-        const filtered = result.filter((p: any) =>
-          filterIds.every((fid) =>
-            (p.tags ?? []).some((t: any) => t && t.id === fid)
-          )
-        );
-        filtered.sort((a: any, b: any) => {
-          const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt);
-          const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt);
-          return tb - ta;
-        });
-
-        const pageStr = searchParams.get("page");
-        if (pageStr) {
-          const page = Math.max(1, parseInt(pageStr) || 1);
-          const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit")!) || 20));
-          const total = filtered.length;
-          const start = (page - 1) * limit;
-          return NextResponse.json({ items: filtered.slice(start, start + limit), total, page, limit });
-        }
-        return NextResponse.json(filtered);
-      }
-    }
-
-    result.sort((a, b) => {
-      const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt);
-      const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : Number(b.createdAt);
-      return tb - ta;
-    });
-
-    const pageStr = searchParams.get("page");
-    if (pageStr) {
-      const page = Math.max(1, parseInt(pageStr) || 1);
-      const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit")!) || 20));
-      const total = result.length;
-      const start = (page - 1) * limit;
-      return NextResponse.json({ items: result.slice(start, start + limit), total, page, limit });
-    }
-
-    return NextResponse.json(result);
+    return NextResponse.json(pageStr ? { items: result, total, page: parseInt(pageStr), limit } : result);
   } catch (e) {
     console.error("/api/problems 错误:", e);
     return NextResponse.json({ error: String(e) }, { status: 500 });

@@ -50,7 +50,8 @@ async function getAccessToken(): Promise<string | null> {
     };
 
     return data.access_token;
-  } catch {
+  } catch (e) {
+    console.error("百度 Token 获取失败:", e);
     return null;
   }
 }
