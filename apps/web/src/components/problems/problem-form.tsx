@@ -18,11 +18,11 @@ type SelectedMap = Record<TagType, Tag[]>;
 const formSchema = z.object({
   content: z.string().min(1, "题目内容不能为空").max(5000, "题目内容不能超过 5000 个字符"),
   answer: z.string().min(1, "错误作答不能为空"),
+  correctAnswer: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
-/** 前端图片压缩：Canvas API 等比压缩宽度 > 2048px 的图片 */
 function compressImage(file: File): Promise<{ base64: string; fileName: string }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -66,13 +66,12 @@ export function ProblemForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [step, setStep] = useState<"form" | "ai-loading" | "confirm">("form");
-  const [formData, setFormData] = useState<{ content: string; answer: string }>({ content: "", answer: "" });
+  const [formData, setFormData] = useState<{ content: string; answer: string; correctAnswer?: string }>({ content: "", answer: "" });
   const [selectedTags, setSelectedTags] = useState<SelectedMap>({
     SUBJECT: [], KNOWLEDGE_POINT: [], ERROR_REASON: [],
   });
   const [aiSuggestions, setAiSuggestions] = useState<TagSuggestion[] | null>(null);
   const [aiError, setAiError] = useState(false);
-  const [problemId, setProblemId] = useState<number | null>(null);
   const [imageKey, setImageKey] = useState<string | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
@@ -81,10 +80,9 @@ export function ProblemForm() {
 
   const { register, handleSubmit, formState: { errors }, setError, setValue } = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: { content: "", answer: "" },
+    defaultValues: { content: "", answer: "", correctAnswer: "" },
   });
 
-  // 图片预览
   useEffect(() => {
     if (!imageKey) { setImagePreviewUrl(null); return; }
     let cancelled = false;
@@ -158,13 +156,13 @@ export function ProblemForm() {
       const formData = new FormData();
       formData.set("content", data.content);
       formData.set("answer", data.answer);
+      if (data.correctAnswer) formData.set("correctAnswer", data.correctAnswer);
       if (imageKey) formData.set("imageKey", imageKey);
 
-      // 进入 AI 加载态
       setStep("ai-loading");
       setAiError(false);
 
-      setFormData({ content: data.content, answer: data.answer });
+      setFormData({ content: data.content, answer: data.answer, correctAnswer: data.correctAnswer });
       const result = await analyzeProblem(formData);
       if (result?.error) {
         setError("root", { message: result.error });
@@ -188,12 +186,10 @@ export function ProblemForm() {
     startTransition(async () => {
       const entries: { tagId: number; source: "AI" | "MANUAL" }[] = [];
 
-      // AI 标签
       for (const s of (aiSuggestions ?? [])) {
         entries.push({ tagId: s.tagId, source: "AI" });
       }
 
-      // 手动标签
       for (const [, tags] of Object.entries(selectedTags)) {
         for (const t of tags) {
           if (!entries.some((e) => e.tagId === t.id)) {
@@ -202,7 +198,13 @@ export function ProblemForm() {
         }
       }
 
-      const input = { content: formData.content, answer: formData.answer, imageKey: imageKey, tagEntries: entries };
+      const input = {
+        content: formData.content,
+        answer: formData.answer,
+        correctAnswer: formData.correctAnswer || undefined,
+        imageKey: imageKey,
+        tagEntries: entries,
+      };
       const result = await saveProblem(input);
       if (result?.error) {
         setError("root", { message: result.error });
@@ -224,7 +226,6 @@ export function ProblemForm() {
 
   const TYPE_LABEL: Record<string, string> = { SUBJECT: "学科", KNOWLEDGE_POINT: "知识点", ERROR_REASON: "错因" };
 
-  // 确认阶段 UI
   if (step === "ai-loading") {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -247,7 +248,6 @@ export function ProblemForm() {
           <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">{errors.root.message}</div>
         )}
 
-        {/* AI 建议区 */}
         {aiSuggestions && aiSuggestions.length > 0 ? (
           <div className="rounded-md border border-blue-200 bg-blue-50/50 p-4 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
@@ -270,7 +270,6 @@ export function ProblemForm() {
           </div>
         ) : null}
 
-        {/* AI 降级提示 */}
         {aiError && (
           <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <AlertCircle className="h-4 w-4" />
@@ -278,7 +277,6 @@ export function ProblemForm() {
           </div>
         )}
 
-        {/* 手动标签区 */}
         <div className="space-y-3">
           <p className="text-sm font-medium text-muted-foreground">手动补充标签</p>
           <TagSelector
@@ -301,7 +299,6 @@ export function ProblemForm() {
     );
   }
 
-  // 表单 UI
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl">
       {errors.root && (
@@ -367,6 +364,13 @@ export function ProblemForm() {
           className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           placeholder="请输入你的错误作答内容" />
         {errors.answer && <p className="text-sm text-destructive">{errors.answer.message}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="correctAnswer" className="text-sm font-medium">正确作答（可选）</label>
+        <textarea id="correctAnswer" {...register("correctAnswer")} rows={4}
+          className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder="输入正确答案（可选）" />
       </div>
 
       <button type="submit" disabled={isPending}

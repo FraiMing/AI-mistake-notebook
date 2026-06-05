@@ -13,6 +13,7 @@ import type { TagSuggestion } from "@/lib/ai-tagging-action";
 const problemSchema = z.object({
   content: z.string().min(1).max(5000),
   answer: z.string().min(1),
+  correctAnswer: z.string().optional(),
 });
 
 export type AnalyzeResult = { error?: string; aiSuggestions?: TagSuggestion[] | null };
@@ -33,6 +34,7 @@ export async function analyzeProblem(formData: FormData): Promise<AnalyzeResult>
 export interface SaveProblemInput {
   content: string;
   answer: string;
+  correctAnswer?: string | null;
   imageKey?: string | null;
   tagEntries: { tagId: number; source: "AI" | "MANUAL" }[];
 }
@@ -41,7 +43,7 @@ export async function saveProblem(input: SaveProblemInput): Promise<{ error?: st
   const session = await auth();
   if (!session?.user?.id) return { error: "未登录" };
 
-  const parsed = problemSchema.safeParse({ content: input.content, answer: input.answer });
+  const parsed = problemSchema.safeParse({ content: input.content, answer: input.answer, correctAnswer: input.correctAnswer });
   if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "表单数据无效" };
 
   try {
@@ -50,6 +52,7 @@ export async function saveProblem(input: SaveProblemInput): Promise<{ error?: st
     const userId = Number(session.user.id);
     db.insert(problems).values({
       userId, content: parsed.data.content, answer: parsed.data.answer,
+      correctAnswer: input.correctAnswer ?? undefined,
       imageKey: input.imageKey ?? undefined, createdAt: now, updatedAt: now,
     }).run();
     const allP = db.select().from(problems).all().filter((p) => p.userId === userId);

@@ -3,7 +3,7 @@ import OpenAI from "openai";
 let _lastKey = "";
 let client: OpenAI | null = null;
 
-/** 获取 DeepSeek API 客户端单例——key 变化时自动重建 */
+/** 获取 DeepSeek API 客户端单例 — key 变化时自动重建 */
 export function getAIClient(): OpenAI {
   const apiKey = process.env.DEEPSEEK_API_KEY ?? "sk-placeholder";
   const baseURL = process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com";
@@ -19,3 +19,9 @@ export { autoTagProblem } from "./tagging";
 export type { AutoTagResult } from "./tagging";
 export { AutoTaggingError } from "./tagging";
 export { SYSTEM_PROMPT, buildTaggingUserMessage } from "./prompts/tagging";
+
+export { explainProblem } from "./explain";
+export type { ExplainInput } from "./explain";
+
+export { generateSimilarQuestion } from "./similar-question";
+export type { SimilarQuestionInput, SimilarQuestionResult } from "./similar-question";

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { X, Maximize2 } from "lucide-react";
+import { X, Maximize2, BookOpen } from "lucide-react";
 import { useTagFilterStore } from "@/stores/tag-filter-store";
 import { TimelineGroup } from "@/components/problems/timeline-group";
 
@@ -11,8 +11,8 @@ type Tag = { id: number; name: string; type: string; source?: string };
 type TagType = "SUBJECT" | "KNOWLEDGE_POINT" | "ERROR_REASON";
 
 interface Problem {
-  id: number; content: string; answer: string;
-  imageKey: string | null; createdAt: number | string; tags?: Tag[];
+  id: number; content: string; answer: string; correctAnswer: string | null;
+  imageKey: string | null; zone: string; createdAt: number | string; tags?: Tag[];
 }
 
 const TYPE_LABEL: Record<TagType, string> = { SUBJECT: "学科", KNOWLEDGE_POINT: "知识点", ERROR_REASON: "错因" };
@@ -67,6 +67,13 @@ function renderProblemCard(p: Problem) {
         </span>))}
       </div>)}
     </div>
+    {p.zone === "TEMPORARY" && (
+      <div className="shrink-0 flex items-end">
+        <Link href={`/problems/${p.id}/review`} className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90">
+          <BookOpen className="h-3.5 w-3.5" /> 复习
+        </Link>
+      </div>
+    )}
   </div>);
 }
 
@@ -80,7 +87,7 @@ export default function ProblemsPage() {
   const tagsByType = { SUBJECT: allTags.filter((t) => t.type === "SUBJECT"), KNOWLEDGE_POINT: allTags.filter((t) => t.type === "KNOWLEDGE_POINT"), ERROR_REASON: allTags.filter((t) => t.type === "ERROR_REASON") };
 
   const params = new URLSearchParams();
-  params.set("zone", activeZone);
+  if (activeZone) params.set("zone", activeZone);
   if (allSelectedIds.length > 0) params.set("tagIds", allSelectedIds.join(","));
   const queryString = params.toString();
 

@@ -6,7 +6,7 @@ import {
   primaryKey,
 } from "drizzle-orm/sqlite-core";
 
-/** 用户表 */
+/** 鐢ㄦ埛琛?*/
 export const users = sqliteTable("User", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull().unique(),
@@ -14,7 +14,7 @@ export const users = sqliteTable("User", {
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
 });
 
-/** 题目表（业务核心） */
+/** 棰樼洰琛紙涓氬姟鏍稿績锛?*/
 export const problems = sqliteTable("Problem", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("userId")
@@ -23,13 +23,14 @@ export const problems = sqliteTable("Problem", {
   content: text("content").notNull(),
   answer: text("answer").notNull(),
   imageKey: text("imageKey"),
+  correctAnswer: text("correctAnswer"),
   zone: text("zone").notNull().default("TEMPORARY"),
   masteryScore: real("masteryScore").notNull().default(50),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull(),
 });
 
-/** 标签表 */
+/** 鏍囩琛?*/
 export const tags = sqliteTable("Tag", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -41,7 +42,7 @@ export const tags = sqliteTable("Tag", {
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull(),
 });
 
-/** 题目-标签关联表（多对多），source 字段区分 AI 自动标注 / 手动标注 */
+/** 棰樼洰-鏍囩鍏宠仈琛紙澶氬澶氾級锛宻ource 瀛楁鍖哄垎 AI 鑷姩鏍囨敞 / 鎵嬪姩鏍囨敞 */
 export const problemTags = sqliteTable(
   "ProblemTag",
   {
@@ -59,3 +60,15 @@ export const problemTags = sqliteTable(
     pk: primaryKey({ columns: [table.problemId, table.tagId] }),
   })
 );
+
+/** 复倪记录表 */
+export const reviewLogs = sqliteTable("ReviewLog", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  problemId: integer("problemId")
+    .notNull()
+    .references(() => problems.id),
+  understood: integer("understood").notNull(),
+  reviewedAt: integer("reviewedAt", { mode: "timestamp" }).notNull(),
+  confusedText: text("confusedText"),
+  similarQuestionGenerated: text("similarQuestionGenerated"),
+});
